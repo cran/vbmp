@@ -11,7 +11,6 @@ function(X, t.class, X.TEST, t.class.TEST, theta,  control = list()) {
 ## Thresh - Convergence threshold on marginal likelihood lower-bound
 ## InfoLevel - 0 to suppress tracing ( > 0  to print different levels
 ##             of monitoring information)
-
     # ------------ check data dimension
     if (is.null(dim(X)))  X <- matrix(X,nrow=length(X),ncol=1);
     if (is.null(dim(X.TEST))){
@@ -22,15 +21,16 @@ function(X, t.class, X.TEST, t.class.TEST, theta,  control = list()) {
     con <- list(InfoLevel=0, sFILE.TRACE=NULL, bThetaEstimate=FALSE, 
         sKernelType="gauss", maxIts=50, Thresh=1e-4, tmpSave=NULL,
         nSampsTG=1000, nSampsIS=1000, nSmallNo=1e-10, parGammaSigma=1e-6, 
-        parGammaTau=1e-6, bPlotFitting=FALSE);
+        parGammaTau=1e-6, bMonitor=FALSE, bPlotFitting=FALSE);
     con[names(control)] <- control;
+    if (con$bPlotFitting) con$bMonitor <- TRUE;
     if (is.factor(t.class) || is.character(t.class)){
         temp <- as.numeric(factor(c(as.character(t.class), as.character(t.class.TEST))));
         t.class <- temp[1:length(t.class)];
         t.class.TEST <- temp[(length(t.class)+1):length(temp)];
         rm(temp);
     }
-    
+   if (any(theta<=0)) stop("theta params (scale) must be > 0"); 
 ## ------------------------------------------------------------------------------
     G.LOWER.BOUND.DEFAULT <-  -1e-3; ## default lower bound value
     G.DIFF.DEFAULT        <-  1e100; ## Monitor difference in marginal likelihood
@@ -62,7 +62,7 @@ function(X, t.class, X.TEST, t.class.TEST, theta,  control = list()) {
     logDetKi  <- safeLogDet(Ki);   
     logDetPHI <- safeLogDet(PHI);  
     ## Collect all the posterior mean values of the covariance params
-    THETA <- NULL;
+    THETA <- matrix(theta, nrow=1, ncol=length(theta))
     ## Collect all the values of the lower-bound
     lowerBound <- G.LOWER.BOUND.DEFAULT;
     ## Monitor difference in marginal likelihood
@@ -103,16 +103,14 @@ function(X, t.class, X.TEST, t.class.TEST, theta,  control = list()) {
             #Theta <- diag(theta);
             ## - formula (4.8)  pag 1797
             psi   <- (con$parGammaSigma + 1)/(con$parGammaTau + theta);
+            if (con$bMonitor) THETA <- rbind(THETA, theta);
             if (con$bPlotFitting) {
-                if (its == 1) par(mfrow=c(2, 2));
-                if (is.null(THETA)) {
-                    THETA <- matrix(theta, nrow=1, ncol=length(theta))
-                } else THETA <- rbind(THETA, theta);
+                if (its == 1) par(mfrow=c(2, 2));                
                 scov <- matrix(as.numeric(safeLog(THETA)), ncol=ncol(THETA),
                     nrow=nrow(THETA));
                 plot(NULL, type="n", xlim=c(1,nrow(scov)), xlab="Iteration",
                      main="Covariance Params Posterior Mean Values",
-                     ylim=c(min(scov), max(scov)), ylab="log(theta)");
+                     ylim=c(min(scov)-1e-6, max(scov)+1e-6), ylab="log(theta)");
                 for (kkk in 1:ncol(scov)) {
                     lines(scov[, kkk],  lty="dotdash", col=kkk);
                 }
@@ -144,7 +142,7 @@ function(X, t.class, X.TEST, t.class.TEST, theta,  control = list()) {
         ## Monitoring convergence
         scan.diff <- abs(100*(scan.lower.bound - lowerBound[its])/lowerBound[its]);
         bconverged <- (scan.diff < con$Thresh);
-        if (bconverged || its == con$maxIts || con$bPlotFitting) {
+        if (con$bMonitor || bconverged || its == con$maxIts || con$bPlotFitting) {
             ## --------------------------------------------------------------
             printTrace(paste(its, "> Compute the predictive posteriors on the test set"),
                 con$sFILE.TRACE, con$InfoLevel - 1);
@@ -203,11 +201,10 @@ function(X, t.class, X.TEST, t.class.TEST, theta,  control = list()) {
                 ", Predictive Likelihood = ", predictive.likelihood/Ntest),
                 con$sFILE.TRACE, con$InfoLevel);
             #Acc <- 100 - testErr[its];
-        vbmultiprob.obj <- structure( list(testErr=testErr, PL=PL,
-            Ptest=Ptest, X=X, invPHI=invPHI, Y=Y, Kc=Kc, M=M,
-            sKernelType=con$sKernelType, theta=theta, 
-            lowerBound=lowerBound),  class="VBMP.obj");
-            
+            vbmultiprob.obj <- structure( list(
+               Ptest=Ptest, X=X, invPHI=invPHI, Y=Y, Kc=Kc, M=M,
+               sKernelType=con$sKernelType, theta=THETA, 
+               lowerBound=lowerBound,testErr=testErr, PL=PL),  class="VBMP.obj");
         }
         if (! is.null(con$tmpSave)) save(vbmultiprob.obj, file=con$tmpSave);
     }

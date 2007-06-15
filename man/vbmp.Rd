@@ -3,7 +3,7 @@
 
 \title{Variational Bayesian Multinomial Probit Regression with Gaussian Process Priors.}
 \description{
-  Used to fit a Multinomial Probit Regression model, spefified by giving the 
+  Used to fit a Multinomial Probit Regression model, specified by giving the 
   matrix design \code{X}, the associated response variables \code{t.class}, kernel type and covariate 
   scaling parameters. Covariance paramters can be inferred from the data.
 }
@@ -48,8 +48,10 @@ vbmp(X, t.class, X.TEST, t.class.TEST, theta, control = list())
     (ill-conditioned covariance matrix). Defaults to 1e-10.}
   \item{parGammaTau,parGammaSigma}{The location and scale parameters of the 
      Gamma prior over covaraince params. Default to 1e-6.}
+  \item{bMonitor}{TRUE to collect monitor convergence diagnostics at each
+     iteration. Defaults to FALSE.}
   \item{bPlotFitting}{TRUE to plot test performance results at each iteration 
-      during model estimation. Defaults to FALSE.}
+      during model estimation (if TRUE it forces bMonitor to TRUE). Defaults to FALSE.}
  }
 
 
@@ -62,7 +64,8 @@ An object of class "VBMP.obj" is a list containing at least the following compon
   \item{invPHI}{Inverse of the Kernel matrix}
   \item{Y}{Matrix of auxiliary variables}
   \item{M}{Matrix of GP random variables}            
-  \item{theta}{covariance kernel hyperparameters}            
+  \item{theta}{covariance kernel hyperparameters (estimates computed during 
+       model fitting, if inferred}            
   \item{sKernelType }{Kernel function used in training and predicting}            
   \item{Test.Err}{Out-of-Sample Percent Prediction error estimates computed 
    during model fitting (0-1 error loss).}
@@ -70,6 +73,9 @@ An object of class "VBMP.obj" is a list containing at least the following compon
   \item{LOWER.BOUND}{Lower bound estimates computed during model fitting}            
   
 }
+%\seealso{ See Also as \code{\link{covParams,lowerBound,plotDiagnostics,
+% predClass,predError, predLik}}
+
 \references{ 
  Girolami M, Rogers S, \emph{Variational Bayesian Multinomial Probit Regression with Gaussian Process Priors}, Neural Computation 18, 1790-1817 (2006).
  
@@ -89,17 +95,21 @@ An object of class "VBMP.obj" is a list containing at least the following compon
 ## Samples of 2-D data points drawn from three nonlinearly separable
 ## classes which take the form of two annular rings and one zero-centered
 ## Gaussian are used in this little illustrative example. 
-genSample <- function(n) {
+genSample <- function(n, noiseVar=0) {
+    ## class 1 and 2 (x ~ U(0,1))
     u <- 4. * matrix(runif(2*n), nrow=n, ncol=2) - 2.;
     i <- which(((u[, 1]^2 + u[, 2]^2) > .1) & ((u[, 1]^2 + u[, 2]^2) < .5) );
     j <- which(((u[, 1]^2 + u[, 2]^2) > .6) & ((u[, 1]^2 + u[, 2]^2) < 1) );
     X <- u[c(i, j),];
     t.class <- c(rep(1, length(i)),rep(2, length(j)));
+    ## class 3 (x ~ N(0,1))
     x <- 0.1 * matrix(rnorm(2*length(i)), ncol=2, nrow=length(i) );
     k <- which((x[, 1]^2 + x[, 2]^2) < 0.1);
     X <- rbind(X, x[k, ]);
     t.class <- c(t.class, rep(3, length(k)));
-    list(t.class=t.class, X=X);
+    ## add random coloumns
+    if (noiseVar>0) X <- cbind(X, matrix(rnorm(noiseVar*nrow(X)), ncol=noiseVar, nrow=nrow(X)));
+    structure( list( t.class=t.class, X=X), class="MultiNoisyData");
 }
 
 set.seed(100); ## Init random number generator
@@ -107,8 +117,10 @@ set.seed(100); ## Init random number generator
 ## Generate training and test samples as an independent 
 ## test set to assess out-of-sample prediction error 
 ## and predictive likelihoods.
-dataXt.train <- genSample(Ntrain <- 500);
-dataXt.test <- genSample(Ntest <- 500);
+nNoisyInputs <- 0;       ## number of additional noisy input parameters
+Ntest <- Ntrain <- 500;  ## sample sizes
+dataXt.train <- genSample(Ntrain, nNoisyInputs);
+dataXt.test  <- genSample(Ntest,  nNoisyInputs);
 
 \dontrun{ 
  theta <- runif(ncol(dataXt.train$X));
