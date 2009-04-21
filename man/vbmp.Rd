@@ -24,7 +24,9 @@ vbmp(X, t.class, X.TEST, t.class.TEST, theta, control = list())
  Compute the predictive posteriors on the test set and the associated likelihood 
  and test errors at each iteration.
 
- The control argument is a list that can supply any of the following components:
+ The control argument is a list that can supply any of the following
+ components:
+\describe{
   \item{InfoLevel}{ 0 to suppress tracing ( > 0  to print different levels
           of monitoring information) }
   \item{sFILE.TRACE}{ File name where to redirect output (default NULL) }
@@ -40,6 +42,9 @@ vbmp(X, t.class, X.TEST, t.class.TEST, theta, control = list())
      Defaults to 50.}
   \item{Thresh}{Convergence threshold on marginal likelihood lowerbound. 
      Defaults to 1e-4.}
+  \item{method}{Integral computation method: "quadrature" (Gaussian quadrature)
+     or "classic"(simple sampler).  Defaults to "quadrature".}     
+  \item{nNodesQuad}{Number of nodes used for quadrature. Defaults to 49.}     
   \item{nSampsTG}{Number of samples used in obtaining mean of truncated 
      Gaussian. Defaults to 1000.}
   \item{nSampsIS}{Number of samples used in the importance sampler. 
@@ -54,6 +59,7 @@ vbmp(X, t.class, X.TEST, t.class.TEST, theta, control = list())
       during model estimation (if TRUE it forces bMonitor to TRUE). Defaults to FALSE.}
  }
 
+}
 
 \value{
 \code{vbmp} returns an object of class "VBMP.obj". 
@@ -78,8 +84,8 @@ An object of class "VBMP.obj" is a list containing at least the following compon
 
 \references{ 
  Girolami M, Rogers S, \emph{Variational Bayesian Multinomial Probit Regression with Gaussian Process Priors}, Neural Computation 18, 1790-1817 (2006).
- 
- \url{http://www.dcs.gla.ac.uk/~girolami}
+ Lama N, Girolami M \emph{vbmp: Variational Bayesian Multinomial Probit Regression for multi-class classification in R}, Bioinformatics 24(1):135-136 (2008). 
+ \url{http://bioinformatics.oxfordjournals.org/cgi/content/short/btm535v1}
  }
 \author{ N Lama \email{nicola.lama@unina2.it}, MA Girolami \email{girolami@dcs.gla.ac.uk} }
 %\note{ ~~further notes~~ 
@@ -112,7 +118,7 @@ genSample <- function(n, noiseVar=0) {
     structure( list( t.class=t.class, X=X), class="MultiNoisyData");
 }
 
-set.seed(100); ## Init random number generator
+set.seed(123); ## Init random number generator
 
 ## Generate training and test samples as an independent 
 ## test set to assess out-of-sample prediction error 
@@ -146,9 +152,19 @@ predError(res);
 ## Leave-one-out (LOO) cross-validation prediction error of the probabilistic 
 ## Gaussian process classifier used in Zsofia Kote-Jarai et al. 
 ## Clin Cancer Res 2006;12(13);3896-3901
-  load(url("http://www.dcs.gla.ac.uk/people/personal/girolami/pubs_2005/VBGP/BRCA12.RData"));
-  brca.y <- as.numeric(BRCA12$y);
-  brca.x <- as.matrix(BRCA12[,-1]);
+
+  if(any(installed.packages()[,1]=="Biobase")) {
+    library("Biobase");
+    data("BRCA12");
+    brca.y <- BRCA12$Target.class;
+    brca.x <- t(exprs(BRCA12));
+  } else {
+    print("Deprecated.....");
+    load(url("http://www.dcs.gla.ac.uk/people/personal/girolami/pubs_2005/VBGP/BRCA12.RData"));
+    brca.y <- as.numeric(BRCA12$y);
+    brca.x <- as.matrix(BRCA12[,-1]);
+  }
+  
   sKernelType <- "iprod";  ## Covariance function type
   Thresh <- 1e-8;  ## Iteration threshold
   InfoLevel <- 1;
@@ -182,7 +198,8 @@ predError(res);
 %      bThetaEstimate=T, maxIts=100));
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.
-\seealso{ See Also as \code{\link{lowerBound}}, \code{\link{predError}}, 
+\seealso{ See Also as \code{\link{predictCPP}}, \code{\link{covParams}}, 
+ \code{\link{lowerBound}}, \code{\link{predError}}, 
  \code{\link{predLik}}, \code{\link{predClass}}}
 
 \keyword{ models }

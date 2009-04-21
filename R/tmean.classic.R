@@ -1,4 +1,4 @@
-`tmean` <-
+`tmean.classic` <-
 function(m, indexMax, Nsamps) {
     ## This function computes the mean of the truncated Gaussian as detailed in
     ## the paper equations (5) & (6).
